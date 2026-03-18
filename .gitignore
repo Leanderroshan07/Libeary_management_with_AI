@@ -1,0 +1,32 @@
+# Dependencies
+**/node_modules/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python cache
+**/__pycache__/
+**/*.py[cod]
+
+# Environment files (keep only examples)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build outputs
+client/dist/
+client/.vite/
+**/coverage/
+
+# Logs
+**/*.log
+
+# Local runtime data
+library_rag/chroma_db/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
