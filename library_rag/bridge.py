@@ -46,7 +46,7 @@ def run_chat(payload: dict):
     rag_app.append_history(session_id, query, answer)
 
     if require_llm and not llm_used:
-        answer = "gemini is not available\n\n" + rag_app.build_manual_answer(query, docs)
+        answer = "llm is not available\n\n" + rag_app.build_manual_answer(query, docs)
 
     return {
         "ok": True,

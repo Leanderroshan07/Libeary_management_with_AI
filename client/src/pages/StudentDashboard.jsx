@@ -49,10 +49,10 @@ const StudentDashboard = () => {
                 query,
                 sessionId: `student-${user.id}`
             });
-            const answer = res.data?.answer || 'gemini is not available';
+            const answer = res.data?.answer || 'llm is not available';
             setChatMessages(prev => [...prev, { role: 'assistant', content: answer }]);
         } catch (err) {
-            setChatMessages(prev => [...prev, { role: 'assistant', content: err.response?.data?.message || 'gemini is not available' }]);
+            setChatMessages(prev => [...prev, { role: 'assistant', content: err.response?.data?.message || 'llm is not available' }]);
         } finally {
             setChatLoading(false);
         }
@@ -135,7 +135,7 @@ const StudentDashboard = () => {
                     <Bot /> Library RAG Chatbot
                 </h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                    Answers are shown only when Gemini is available. Otherwise you will see: gemini is not available.
+                    Answers are shown only when the LLM is available. Otherwise you will see: llm is not available.
                 </p>
 
                 <div style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', background: 'var(--surface)', padding: '1rem', minHeight: '220px', maxHeight: '320px', overflowY: 'auto', marginBottom: '1rem' }}>

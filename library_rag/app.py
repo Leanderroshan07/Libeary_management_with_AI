@@ -6,9 +6,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-# ── Load env: library_rag/.env → server/.env fallback ──────────────────────
+# Load env from a single backend source of truth: server/.env
 _BASE = Path(__file__).parent
-load_dotenv(_BASE / ".env")
 load_dotenv(_BASE.parent / "server" / ".env")
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -74,22 +73,18 @@ def get_llm():
     if _llm is not None:
         return _llm
 
-    api_key = (
-        os.getenv("Gemini_API_KEY")
-        or os.getenv("GOOGLE_API_KEY")
-        or os.getenv("GEMINI_KEY")
-    )
-    if not api_key:
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
         return None
 
     try:
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain_groq import ChatGroq
     except Exception:
         return None
 
-    _llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        google_api_key=api_key,
+    _llm = ChatGroq(
+        model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+        groq_api_key=groq_api_key,
         temperature=0.7,
     )
     return _llm
@@ -155,13 +150,13 @@ def get_llm_mode(use_llm_requested: bool) -> tuple[bool, str]:
         return False, "manual"
     if get_llm() is None:
         return False, "manual_fallback"
-    return True, "gemini"
+    return True, "groq"
 
 
 def llm_warning(mode: str) -> str:
     if mode == "manual_fallback":
         return (
-            "\n\n[Notice] Gemini is not available (missing key/package) or request failed. "
+            "\n\n[Notice] LLM provider is not available (missing key/package) or request failed. "
             "Returned manual retrieval output instead."
         )
     return ""
@@ -169,11 +164,14 @@ def llm_warning(mode: str) -> str:
 
 def llm_failure_to_manual(query: str, docs: list[Document], error: Exception) -> str:
     answer = build_manual_answer(query, docs)
+    provider = "GROQ"
     err_text = str(error).strip().lower()
     if "resource_exhausted" in err_text or "quota" in err_text:
-        reason = "Gemini quota exceeded"
+        reason = f"{provider} quota exceeded"
+    elif "rate limit" in err_text or "429" in err_text:
+        reason = f"{provider} rate limit exceeded"
     else:
-        reason = "Gemini unavailable"
+        reason = f"{provider} unavailable"
     return answer + f"\n\n[Notice] {reason}. Returned manual retrieval output."
 
 
@@ -486,7 +484,7 @@ def api_status():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Library RAG: terminal mode by default")
     parser.add_argument("--server", action="store_true", help="Run API server mode (localhost)")
-    parser.add_argument("--use-llm", action="store_true", help="Enable Gemini in terminal mode")
+    parser.add_argument("--use-llm", action="store_true", help="Enable Groq in terminal mode")
     parser.add_argument("--session-id", default="terminal", help="Session ID for chat history")
     parser.add_argument("--k", type=int, default=4, help="Top-k chunks to retrieve")
     parser.add_argument("--reingest", action="store_true", help="Force rebuild of Chroma vector store")

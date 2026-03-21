@@ -41,13 +41,14 @@ router.post('/chat', authMiddleware, async (req, res) => {
 
         if (!result.llmUsed) {
             const answerBody = (result.answer || '').trim();
-            const bodyIsOnlyUnavailable = answerBody.toLowerCase() === 'gemini is not available';
+            const lowerAnswerBody = answerBody.toLowerCase();
+            const bodyIsOnlyUnavailable = lowerAnswerBody === 'llm is not available';
             const fallbackBody = (!answerBody || bodyIsOnlyUnavailable)
                 ? buildChunkFallbackText(result.chunkPreviews)
                 : answerBody;
 
             return res.json({
-                answer: `gemini is not available\n\n${fallbackBody}`.trim(),
+                answer: `llm is not available\n\n${fallbackBody}`.trim(),
                 llmAvailable: false,
                 mode: result.mode,
                 sources: result.sources,
