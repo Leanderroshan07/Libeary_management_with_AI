@@ -1,13 +1,21 @@
 import axios from 'axios';
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const normalizeBaseUrl = (baseUrl) => String(baseUrl || '').replace(/\/+$/, '');
+
+const configuredBaseUrl = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
+const defaultProdBaseUrl = normalizeBaseUrl(import.meta.env.VITE_FALLBACK_API_BASE_URL);
+const isDev = import.meta.env.DEV;
 
 const fallbackBaseUrls = [
     configuredBaseUrl,
-    'http://localhost:5001',
-    'http://localhost:5002',
-    'http://localhost:5000'
-].filter(Boolean);
+    !isDev ? defaultProdBaseUrl : null,
+    isDev ? 'http://localhost:5001' : null,
+    isDev ? 'http://localhost:5002' : null,
+    isDev ? 'http://localhost:5000' : null
+]
+    .filter(Boolean)
+    .map(normalizeBaseUrl)
+    .filter((value, index, array) => array.indexOf(value) === index);
 
 let activeBaseUrl = null;
 
@@ -22,6 +30,10 @@ const orderedBaseUrls = () => {
 const isNetworkError = (err) => !err.response;
 
 const requestWithFallback = async (method, path, data, config = {}) => {
+    if (!fallbackBaseUrls.length) {
+        throw new Error('Backend API URL is not configured. Set VITE_API_BASE_URL in Vercel project settings.');
+    }
+
     let lastNetworkError = null;
 
     for (const baseUrl of orderedBaseUrls()) {

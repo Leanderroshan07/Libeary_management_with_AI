@@ -6,8 +6,43 @@ require('dotenv').config();
 
 const app = express();
 
+const parseCsvEnv = (value) => String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const allowedOrigins = parseCsvEnv(process.env.CORS_ORIGIN);
+const allowAllOrigins = allowedOrigins.includes('*');
+const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || 'true').toLowerCase() === 'true';
+
+const isVercelPreviewOrigin = (origin) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+
+const corsOptions = {
+    origin(origin, callback) {
+        // Requests with no Origin header (curl, health checks, server-to-server)
+        // should still be allowed.
+        if (!origin) {
+            callback(null, true);
+            return;
+        }
+
+        if (allowAllOrigins || allowedOrigins.includes(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        if (allowVercelPreviews && isVercelPreviewOrigin(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        callback(new Error('Not allowed by CORS'));
+    },
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use('/books-files', express.static(path.join(__dirname, '..', 'Books')));
 
@@ -26,6 +61,13 @@ app.use('/api/rag', require('./routes/rag'));
 
 app.get('/', (req, res) => {
     res.send('Library Management API is running');
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'library-management-api',
+    });
 });
 
 // Start Server

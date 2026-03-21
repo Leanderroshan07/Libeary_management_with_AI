@@ -3,8 +3,25 @@ services:
     name: library-management-api
     env: node
     plan: free
-    buildCommand: npm install --prefix server && pip install -r requirements.txt
+    buildCommand: npm install --prefix server && (python3 -m pip install -r requirements.txt || python -m pip install -r requirements.txt)
     startCommand: node server/index.js
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: RAG_PYTHON
+        value: python3
+      - key: FINE_RATE_PER_DAY
+        value: 10
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
