@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: library-management-api
+    env: node
+    plan: free
+    buildCommand: npm install --prefix server && pip install -r requirements.txt
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
