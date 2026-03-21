@@ -10,9 +10,10 @@ const PYTHON_CANDIDATES = [
     path.join(ROOT_DIR, '.venv', 'Scripts', 'python.exe'),
     path.join(ROOT_DIR, '.venv', 'bin', 'python'),
     process.env.RAG_PYTHON,
+    'python3',
     'python',
 ].filter(Boolean).filter((candidate, index) => {
-    if (index >= 3) return true;
+    if (index >= 4) return true;
     return fs.existsSync(candidate);
 });
 
