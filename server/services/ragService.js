@@ -84,23 +84,37 @@ async function syncBooksToVectorDb() {
 }
 
 async function chatWithRag({ query, sessionId, history }) {
-    const result = await execBridge('chat', {
-        query,
-        session_id: sessionId,
-        history,
-        use_llm: true,
-        require_llm: false,
-    });
+    try {
+        const result = await execBridge('chat', {
+            query,
+            session_id: sessionId,
+            history,
+            use_llm: true,
+            require_llm: false,
+        });
 
-    return {
-        answer: result.answer,
-        llmUsed: !!result.llm_used,
-        mode: result.mode,
-        sources: result.sources || [],
-        chunkPreviews: Array.isArray(result.chunk_previews) ? result.chunk_previews : [],
-        history: Array.isArray(result.history) ? result.history : [],
-        historyRelated: !!result.history_related,
-    };
+        return {
+            answer: result.answer,
+            llmUsed: !!result.llm_used,
+            mode: result.mode,
+            sources: result.sources || [],
+            chunkPreviews: Array.isArray(result.chunk_previews) ? result.chunk_previews : [],
+            history: Array.isArray(result.history) ? result.history : [],
+            historyRelated: !!result.history_related,
+        };
+    } catch (error) {
+        // Keep API available when optional Python RAG runtime is missing on deployment.
+        return {
+            answer: 'RAG service is temporarily unavailable. Please try again later.',
+            llmUsed: false,
+            mode: 'rag_unavailable',
+            sources: [],
+            chunkPreviews: [],
+            history: Array.isArray(history) ? history : [],
+            historyRelated: false,
+            error: error.message,
+        };
+    }
 }
 
 module.exports = {

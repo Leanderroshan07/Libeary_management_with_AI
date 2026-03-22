@@ -3,7 +3,7 @@ services:
     name: library-management-api
     env: node
     plan: free
-    buildCommand: npm install --prefix server && (python3 -m pip install -r requirements.txt || python -m pip install -r requirements.txt)
+    buildCommand: npm install --prefix server && (python3 -m pip install -r requirements.txt || python -m pip install -r requirements.txt || echo "Skipping optional RAG Python dependencies")
     startCommand: node server/index.js
     healthCheckPath: /api/health
     envVars:
