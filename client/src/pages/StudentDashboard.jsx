@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Book as BookIcon, Calendar, AlertCircle, CheckCircle, Bot, Send } from 'lucide-react';
-import { apiGet, apiPost } from '../utils/api';
+import { Book as BookIcon, Calendar, AlertCircle, CheckCircle, Bot, Send, CreditCard } from 'lucide-react';
+import { apiGet, apiPatch, apiPost } from '../utils/api';
 
 const StudentDashboard = () => {
     const { user } = useAuth();
@@ -10,27 +10,41 @@ const StudentDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [chatInput, setChatInput] = useState('');
     const [chatLoading, setChatLoading] = useState(false);
+    const [payingFineId, setPayingFineId] = useState('');
     const [chatMessages, setChatMessages] = useState([
         { role: 'assistant', content: 'Hi, I am Library RAG. Ask me about books and study content.' }
     ]);
 
+    const fetchData = async () => {
+        try {
+            const [historyRes, finesRes] = await Promise.all([
+                apiGet(`/api/transactions/history/user/${user.id}`),
+                apiGet(`/api/transactions/fines/user/${user.id}`)
+            ]);
+            setIssuedBooks(historyRes.data.filter(i => i.status === 'issued'));
+            setFines(finesRes.data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [historyRes, finesRes] = await Promise.all([
-                    apiGet(`/api/transactions/history/user/${user.id}`),
-                    apiGet(`/api/transactions/fines/user/${user.id}`)
-                ]);
-                setIssuedBooks(historyRes.data.filter(i => i.status === 'issued'));
-                setFines(finesRes.data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
     }, [user.id]);
+
+    const handlePayFine = async (fineId) => {
+        try {
+            setPayingFineId(fineId);
+            await apiPatch(`/api/transactions/fines/${fineId}/pay`);
+            await fetchData();
+        } catch (err) {
+            alert(err.response?.data?.message || 'Unable to process fine payment');
+        } finally {
+            setPayingFineId('');
+        }
+    };
 
     if (loading) return <div>Loading Profile...</div>;
 
@@ -107,22 +121,60 @@ const StudentDashboard = () => {
                 </div>
 
                 <div className="glass" style={{ padding: '2rem' }}>
-                    <h2 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertCircle /> Fine History</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div>
+                            <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}><AlertCircle /> Fine History</h2>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Review due dates, track payments, and clear outstanding dues from here.</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.2rem' }}>Outstanding</p>
+                            <strong style={{ fontSize: '1.25rem', color: totalFine > 0 ? 'var(--accent)' : 'var(--text)' }}>₹{totalFine}</strong>
+                        </div>
+                    </div>
                     <div style={{ display: 'grid', gap: '1rem' }}>
                         {fines.length === 0 ? (
                             <p style={{ color: 'var(--text-muted)' }}>No fine history.</p>
                         ) : (
                             fines.map(fine => (
-                                <div key={fine._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid var(--border)' }}>
-                                    <div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>₹{fine.amount}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{fine.issue?.book?.title}</div>
+                                <div
+                                    key={fine._id}
+                                    style={{
+                                        padding: '1rem',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '0.9rem',
+                                        background: fine.status === 'paid' ? 'rgba(16, 185, 129, 0.04)' : 'rgba(244, 63, 94, 0.04)'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontSize: '1rem', fontWeight: 700 }}>₹{fine.amount}</div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text)', marginTop: '0.25rem' }}>
+                                                {fine.reason || fine.issue?.book?.title || 'Library fine'}
+                                            </div>
+                                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                                                Due {fine.dueDate ? new Date(fine.dueDate).toLocaleDateString() : 'not set'}
+                                                {fine.issue?.book?.title ? ` · ${fine.issue.book.title}` : ''}
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
+                                            <span style={{ padding: '0.3rem 0.7rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700, background: fine.status === 'paid' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)', color: fine.status === 'paid' ? '#10b981' : 'var(--accent)' }}>
+                                                {fine.status === 'paid' ? 'Paid' : 'Unpaid'}
+                                            </span>
+                                            {fine.status === 'paid' ? (
+                                                <CheckCircle size={18} color="#10b981" />
+                                            ) : (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => handlePayFine(fine._id)}
+                                                    disabled={payingFineId === fine._id}
+                                                    style={{ padding: '0.55rem 0.9rem' }}
+                                                >
+                                                    <CreditCard size={16} />
+                                                    {payingFineId === fine._id ? 'Processing...' : 'Pay Now'}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    {fine.status === 'paid' ? (
-                                        <CheckCircle size={18} color="#10b981" />
-                                    ) : (
-                                        <AlertCircle size={18} color="var(--accent)" />
-                                    )}
                                 </div>
                             ))
                         )}

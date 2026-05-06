@@ -12,6 +12,11 @@ function canAccessUserData(requestedUserId, reqUser) {
     return String(reqUser._id) === String(requestedUserId);
 }
 
+async function updateUserFineBalance(userId, delta) {
+    if (!delta) return;
+    await User.findByIdAndUpdate(userId, { $inc: { fineBalance: delta } });
+}
+
 async function upsertFineForIssue(issueDoc, now = new Date()) {
     const issue = issueDoc;
     if (!issue || now <= issue.dueDate) return null;
@@ -21,18 +26,26 @@ async function upsertFineForIssue(issueDoc, now = new Date()) {
     const fineAmount = diffDays * (parseInt(process.env.FINE_RATE_PER_DAY, 10) || 10);
 
     let fine = await Fine.findOne({ issue: issue._id });
+    let balanceDelta = 0;
     if (!fine) {
         fine = new Fine({
             issue: issue._id,
             user: issue.user,
             amount: fineAmount,
             status: 'unpaid',
+            dueDate: issue.dueDate,
+            reason: 'Overdue return'
         });
+        balanceDelta = fineAmount;
     } else if (fine.status === 'unpaid') {
+        const previousAmount = Number(fine.amount) || 0;
         fine.amount = fineAmount;
+        fine.dueDate = fine.dueDate || issue.dueDate;
+        balanceDelta = fineAmount - previousAmount;
     }
 
     await fine.save();
+    await updateUserFineBalance(issue.user, balanceDelta);
 
     if (!issue.fine || String(issue.fine) !== String(fine._id)) {
         issue.fine = fine._id;
@@ -223,12 +236,67 @@ router.get('/fines/user/:userId', authMiddleware, async (req, res) => {
     }
 });
 
-router.patch('/fines/:fineId/pay', [authMiddleware, adminMiddleware], async (req, res) => {
+router.patch('/fines/:fineId/pay', authMiddleware, async (req, res) => {
     try {
-        const fine = await Fine.findByIdAndUpdate(req.params.fineId, { status: 'paid' }, { new: true });
+        const fine = await Fine.findById(req.params.fineId);
+        if (!fine) {
+            return res.status(404).json({ message: 'Fine not found' });
+        }
+
+        if (req.user.role !== 'admin' && String(fine.user) !== String(req.user._id)) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        if (fine.status === 'paid') {
+            return res.json(fine);
+        }
+
+        fine.status = 'paid';
+        await fine.save();
+        await updateUserFineBalance(fine.user, -Number(fine.amount || 0));
         res.json(fine);
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.post('/fines/add', [authMiddleware, adminMiddleware], async (req, res) => {
+    try {
+        const { userId, amount, dueDate, reason } = req.body;
+        
+        if (!userId || !amount || !dueDate) {
+            return res.status(400).json({ message: 'userId, amount, and dueDate are required' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const parsedDueDate = new Date(dueDate);
+        if (Number.isNaN(parsedDueDate.getTime())) {
+            return res.status(400).json({ message: 'Invalid due date' });
+        }
+
+        const fine = new Fine({
+            user: userId,
+            amount: Number(amount),
+            status: 'unpaid',
+            issue: null,
+            dueDate: parsedDueDate,
+            reason: reason || ''
+        });
+
+        await fine.save();
+        await updateUserFineBalance(userId, Number(amount));
+
+        res.status(201).json({
+            message: 'Fine added successfully',
+            fine,
+            fineBalance: (Number(user.fineBalance) || 0) + Number(amount),
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Server error' });
     }
 });
 

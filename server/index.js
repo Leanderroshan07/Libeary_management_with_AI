@@ -13,9 +13,7 @@ const parseCsvEnv = (value) => String(value || '')
 
 const allowedOrigins = parseCsvEnv(process.env.CORS_ORIGIN);
 const allowAllOrigins = allowedOrigins.includes('*');
-const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || 'true').toLowerCase() === 'true';
-
-const isVercelPreviewOrigin = (origin) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+const localOriginRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
 const corsOptions = {
     origin(origin, callback) {
@@ -26,12 +24,12 @@ const corsOptions = {
             return;
         }
 
-        if (allowAllOrigins || allowedOrigins.includes(origin)) {
+        if (localOriginRegex.test(origin)) {
             callback(null, true);
             return;
         }
 
-        if (allowVercelPreviews && isVercelPreviewOrigin(origin)) {
+        if (allowAllOrigins || allowedOrigins.includes(origin)) {
             callback(null, true);
             return;
         }

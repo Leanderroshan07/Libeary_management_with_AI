@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Shield, ShieldOff, Search, PlusCircle, X } from 'lucide-react';
+import { Shield, ShieldOff, Search, PlusCircle, X, CalendarDays } from 'lucide-react';
 import { apiGet, apiPatch, apiPost } from '../utils/api';
+
+const getDefaultDueDate = () => {
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 7);
+    const year = dueDate.getFullYear();
+    const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+    const day = String(dueDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showFineModal, setShowFineModal] = useState(false);
-    const [fineForm, setFineForm] = useState({ userId: '', userName: '', amount: '', reason: '' });
+    const [fineForm, setFineForm] = useState({ userId: '', userName: '', amount: '', dueDate: getDefaultDueDate(), reason: '' });
 
     useEffect(() => {
         fetchUsers();
@@ -40,7 +49,7 @@ const UserManagement = () => {
     );
 
     const openFineModal = (user) => {
-        setFineForm({ userId: user._id, userName: user.name, amount: '', reason: '' });
+        setFineForm({ userId: user._id, userName: user.name, amount: '', dueDate: getDefaultDueDate(), reason: '' });
         setShowFineModal(true);
     };
 
@@ -50,11 +59,12 @@ const UserManagement = () => {
             await apiPost('/api/transactions/fines/add', {
                 userId: fineForm.userId,
                 amount: Number(fineForm.amount),
+                dueDate: fineForm.dueDate,
                 reason: fineForm.reason
             });
 
             setShowFineModal(false);
-            setFineForm({ userId: '', userName: '', amount: '', reason: '' });
+            setFineForm({ userId: '', userName: '', amount: '', dueDate: getDefaultDueDate(), reason: '' });
             fetchUsers();
         } catch (err) {
             alert(err.response?.data?.message || 'Error adding fine');
@@ -108,7 +118,7 @@ const UserManagement = () => {
                                     </span>
                                 </td>
                                 <td style={{ padding: '1.25rem' }}>{user.issuedBooks?.length || 0}</td>
-                                <td style={{ padding: '1.25rem' }}>${Number(user.fineBalance || 0).toFixed(2)}</td>
+                                <td style={{ padding: '1.25rem' }}>₹{Number(user.fineBalance || 0).toFixed(2)}</td>
                                 <td style={{ padding: '1.25rem' }}>
                                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                         <button
@@ -135,38 +145,56 @@ const UserManagement = () => {
 
             {showFineModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-                    <div className="glass" style={{ padding: '2rem', width: '100%', maxWidth: '520px' }}>
+                    <div className="glass" style={{ padding: '2rem', width: '100%', maxWidth: '560px', border: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2>Add Fine</h2>
+                            <div>
+                                <h2 style={{ marginBottom: '0.25rem' }}>Add Fine</h2>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Set the fine amount and the due date for payment.</p>
+                            </div>
                             <X onClick={() => setShowFineModal(false)} style={{ cursor: 'pointer' }} />
                         </div>
-                        <form onSubmit={addFineToUser}>
-                            <div style={{ marginBottom: '1rem' }}>
+                        <form onSubmit={addFineToUser} style={{ display: 'grid', gap: '1rem' }}>
+                            <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>User</label>
                                 <input type="text" value={fineForm.userName} readOnly style={{ width: '100%', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)' }} />
                             </div>
-                            <div style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Fine Amount</label>
-                                <input
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
-                                    value={fineForm.amount}
-                                    onChange={(e) => setFineForm({ ...fineForm, amount: e.target.value })}
-                                    style={{ width: '100%', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)' }}
-                                    required
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Fine Amount</label>
+                                    <input
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        value={fineForm.amount}
+                                        onChange={(e) => setFineForm({ ...fineForm, amount: e.target.value })}
+                                        style={{ width: '100%', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)' }}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Due Date</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <CalendarDays size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                        <input
+                                            type="date"
+                                            value={fineForm.dueDate}
+                                            onChange={(e) => setFineForm({ ...fineForm, dueDate: e.target.value })}
+                                            style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2.5rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)' }}
+                                            required
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div style={{ marginBottom: '2rem' }}>
+                            <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>Reason</label>
                                 <textarea
                                     value={fineForm.reason}
                                     onChange={(e) => setFineForm({ ...fineForm, reason: e.target.value })}
-                                    placeholder="Optional reason"
-                                    style={{ width: '100%', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)', minHeight: '90px' }}
+                                    placeholder="Optional reason for the fine"
+                                    style={{ width: '100%', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)', minHeight: '110px', resize: 'vertical' }}
                                 />
                             </div>
-                            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem' }}>
                                 Add Fine
                             </button>
                         </form>

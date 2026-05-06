@@ -83,8 +83,75 @@ async function syncBooksToVectorDb() {
     };
 }
 
+async function getBooksByEmotion(emotion) {
+    const Book = require('../models/Book');
+    try {
+        const books = await Book.find({ emotions: emotion })
+            .populate('category', 'name')
+            .select('title author description emotions category')
+            .limit(5);
+        return books;
+    } catch (err) {
+        return [];
+    }
+}
+
+function detectEmotion(query) {
+    const EMOTIONS = ['happy', 'sad', 'excited', 'anxious', 'calm', 'motivated', 'reflective', 'inspired', 'lonely', 'peaceful'];
+    const lowerQuery = query.toLowerCase();
+    
+    for (const emotion of EMOTIONS) {
+        if (lowerQuery.includes(`feel ${emotion}`) || 
+            lowerQuery.includes(`feeling ${emotion}`) || 
+            lowerQuery.includes(`i'm ${emotion}`) ||
+            lowerQuery.includes(`im ${emotion}`) ||
+            lowerQuery.includes(`i am ${emotion}`)) {
+            return emotion.charAt(0).toUpperCase() + emotion.slice(1);
+        }
+    }
+    return null;
+}
+
 async function chatWithRag({ query, sessionId, history }) {
     try {
+        // Check if user is expressing an emotion
+        const detectedEmotion = detectEmotion(query);
+        
+        if (detectedEmotion) {
+            const books = await getBooksByEmotion(detectedEmotion);
+            
+            if (books.length > 0) {
+                const bookList = books
+                    .map((b, idx) => `${idx + 1}. **${b.title}** by ${b.author}\n   Category: ${b.category?.name}\n   Description: ${b.description || 'No description'}`)
+                    .join('\n\n');
+                
+                const answer = `I see you're feeling ${detectedEmotion.toLowerCase()}! Here are some books that might resonate with you:\n\n${bookList}`;
+                
+                return {
+                    answer,
+                    llmUsed: false,
+                    mode: 'emotion_recommendation',
+                    sources: books.map(b => b.title),
+                    chunkPreviews: [],
+                    history: Array.isArray(history) ? [...history, { role: 'user', content: query }, { role: 'assistant', content: answer }] : [],
+                    historyRelated: false,
+                };
+            } else {
+                // Emotion detected but no books tagged - inform user
+                const answer = `I understand you're feeling ${detectedEmotion.toLowerCase()}. Unfortunately, we don't have books tagged with that emotion yet. Would you like me to search for relevant content instead?`;
+                
+                return {
+                    answer,
+                    llmUsed: false,
+                    mode: 'emotion_no_books',
+                    sources: [],
+                    chunkPreviews: [],
+                    history: Array.isArray(history) ? [...history, { role: 'user', content: query }, { role: 'assistant', content: answer }] : [],
+                    historyRelated: false,
+                };
+            }
+        }
+        
         const result = await execBridge('chat', {
             query,
             session_id: sessionId,

@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['admin', 'student'], default: 'student' },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   maxBooks: { type: Number, default: 3 },
+  fineBalance: { type: Number, default: 0 },
   issuedBooks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Issue' }]
 }, { timestamps: true });
 

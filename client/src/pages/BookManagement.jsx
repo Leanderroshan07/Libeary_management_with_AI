@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Search, X, RefreshCw } from 'lucide-react';
 import { apiDelete, apiGet, apiPost, apiPut, buildBackendUrl } from '../utils/api';
 
+const EMOTIONS = ['Happy', 'Sad', 'Excited', 'Anxious', 'Calm', 'Motivated', 'Reflective', 'Inspired', 'Lonely', 'Peaceful'];
+
 const BookManagement = () => {
     const [books, setBooks] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [currentBook, setCurrentBook] = useState({ title: '', author: '', isbn: '', category: '', quantity: 1, description: '' });
+    const [currentBook, setCurrentBook] = useState({ title: '', author: '', isbn: '', category: '', quantity: 1, description: '', emotions: [] });
     const [bookFile, setBookFile] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [syncNotice, setSyncNotice] = useState('');
@@ -50,6 +52,7 @@ const BookManagement = () => {
             formData.append('category', getCategoryId(currentBook.category));
             formData.append('quantity', String(currentBook.quantity || 1));
             formData.append('description', currentBook.description || '');
+            formData.append('emotions', JSON.stringify(currentBook.emotions || []));
 
             if (bookFile) {
                 formData.append('bookFile', bookFile);
@@ -67,7 +70,7 @@ const BookManagement = () => {
                 setSyncNotice('Book saved');
             }
             setShowModal(false);
-            setCurrentBook({ title: '', author: '', isbn: '', category: '', quantity: 1, description: '' });
+            setCurrentBook({ title: '', author: '', isbn: '', category: '', quantity: 1, description: '', emotions: [] });
             setBookFile(null);
             fetchData();
         } catch (err) {
@@ -127,7 +130,7 @@ const BookManagement = () => {
                         <RefreshCw size={18} />
                         {resyncLoading ? 'Resyncing...' : 'Resync Vector DB'}
                     </button>
-                    <button onClick={() => { setCurrentBook({ title: '', author: '', isbn: '', category: '', quantity: 1, description: '' }); setBookFile(null); setShowModal(true); }} className="btn btn-primary">
+                    <button onClick={() => { setCurrentBook({ title: '', author: '', isbn: '', category: '', quantity: 1, description: '', emotions: [] }); setBookFile(null); setShowModal(true); }} className="btn btn-primary">
                         <Plus size={20} /> Add New Book
                     </button>
                 </div>
@@ -159,6 +162,7 @@ const BookManagement = () => {
                             <th style={{ padding: '1.25rem' }}>Title</th>
                             <th style={{ padding: '1.25rem' }}>Author</th>
                             <th style={{ padding: '1.25rem' }}>Category</th>
+                            <th style={{ padding: '1.25rem' }}>Emotions</th>
                             <th style={{ padding: '1.25rem' }}>File</th>
                             <th style={{ padding: '1.25rem' }}>Stock</th>
                             <th style={{ padding: '1.25rem' }}>Actions</th>
@@ -176,6 +180,19 @@ const BookManagement = () => {
                                     <span style={{ padding: '0.25rem 0.75rem', borderRadius: '1rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', fontSize: '0.8rem' }}>
                                         {book.category?.name}
                                     </span>
+                                </td>
+                                <td style={{ padding: '1.25rem' }}>
+                                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                        {book.emotions && book.emotions.length > 0 ? (
+                                            book.emotions.map(emotion => (
+                                                <span key={emotion} style={{ padding: '0.25rem 0.5rem', borderRadius: '0.25rem', background: 'rgba(168, 85, 247, 0.2)', color: '#d8b4fe', fontSize: '0.75rem' }}>
+                                                    {emotion}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>None</span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td style={{ padding: '1.25rem' }}>
                                     {book.bookFileName ? (
@@ -239,6 +256,28 @@ const BookManagement = () => {
                             <div style={{ marginBottom: '2rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>Description</label>
                                 <textarea value={currentBook.description} onChange={e => setCurrentBook({ ...currentBook, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', color: 'var(--text)', minHeight: '100px' }} />
+                            </div>
+                            <div style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 600 }}>Emotions (Select applicable moods for this book)</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.75rem' }}>
+                                    {EMOTIONS.map(emotion => (
+                                        <label key={emotion} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '0.5rem', cursor: 'pointer', border: currentBook.emotions.includes(emotion) ? '2px solid var(--primary)' : '1px solid var(--border)' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={currentBook.emotions.includes(emotion)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setCurrentBook({ ...currentBook, emotions: [...currentBook.emotions, emotion] });
+                                                    } else {
+                                                        setCurrentBook({ ...currentBook, emotions: currentBook.emotions.filter(em => em !== emotion) });
+                                                    }
+                                                }}
+                                                style={{ cursor: 'pointer' }}
+                                            />
+                                            {emotion}
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
                             <div style={{ marginBottom: '2rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>Book File (TXT for RAG)</label>

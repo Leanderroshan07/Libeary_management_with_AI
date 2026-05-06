@@ -9,7 +9,8 @@ const bookSchema = new mongoose.Schema({
     totalQuantity: { type: Number, default: 1 },
     description: { type: String },
     coverImage: { type: String },
-    bookFileName: { type: String }
+    bookFileName: { type: String },
+    emotions: [{ type: String }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Book', bookSchema);

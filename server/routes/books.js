@@ -46,6 +46,15 @@ function removeLocalBookFile(fileName) {
 function parseBookPayload(body) {
     const quantity = Number.parseInt(body.quantity, 10);
     const isbn = (body.isbn || '').trim();
+    let emotions = [];
+    try {
+        if (body.emotions) {
+            emotions = typeof body.emotions === 'string' ? JSON.parse(body.emotions) : body.emotions;
+            emotions = Array.isArray(emotions) ? emotions : [];
+        }
+    } catch (e) {
+        emotions = [];
+    }
     return {
         title: body.title,
         author: body.author,
@@ -53,6 +62,7 @@ function parseBookPayload(body) {
         isbn: isbn || undefined,
         description: body.description || '',
         quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        emotions: emotions,
     };
 }
 
@@ -150,6 +160,12 @@ router.put('/:id', [authMiddleware, adminMiddleware, upload.single('bookFile')],
         if (!book) return res.status(404).json({ message: 'Book not found' });
 
         Object.assign(book, payload);
+        
+        // Mark emotions as modified if it was updated
+        if (payload.emotions) {
+            book.markModified('emotions');
+        }
+        
         if (typeof payload.quantity === 'number') {
             book.totalQuantity = Math.max(book.totalQuantity || 0, payload.quantity);
         }
